@@ -1,6 +1,6 @@
 {
   "name": "@joebailey26/turnstile-forms",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Website forms checked by Cloudflare Turnstile and emailed by a Worker, with the Vue composables for the form and widget",
   "repository": {
     "type": "git",
