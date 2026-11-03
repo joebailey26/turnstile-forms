@@ -1,4 +1,5 @@
 import { EmailMessage } from 'cloudflare:email'
+import { EMAIL, INVALID_EMAIL } from './email.ts'
 
 // A form's submitted fields, by name, with empty fields left out.
 export type FormValues = Record<string, string>
@@ -44,7 +45,6 @@ const clean = (value: unknown) => String(value ?? '').replace(/\r/g, '').trim()
 const header = (value: unknown) => clean(value).replace(/\n/g, ' ').slice(0, 200)
 const base64 = (text: string) => btoa(String.fromCharCode(...new TextEncoder().encode(text)))
 const FIELD = /^[A-Za-z][A-Za-z0-9_-]{0,63}$/
-const EMAIL = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/
 // Fields the browser adds that are not part of the message
 const IGNORED = new Set(['cf-turnstile-response', 'form-name', 'submit'])
 
@@ -111,9 +111,16 @@ export function createForms ({ forms, senderName, contactEmail }: FormsOptions) 
     const values: FormValues = Object.fromEntries(fields)
     const email = header(values.email)
     const validEmail = EMAIL.test(email)
-    const missing = (form.required ?? []).some((key) => !values[key])
-    if ((!validEmail && (email || !form.emailOptional)) || fields.length < 2 || missing) {
-      return json({ error: 'A valid email address and your details are required' }, 400)
+    // Say which field is wrong; the form shows this message as it is.
+    const missing = (form.required ?? []).filter((key) => !values[key])
+    if (missing.length) {
+      return json({ error: `Please fill in ${missing.map(label).join(', ')}` }, 400)
+    }
+    if (!validEmail && (email || !form.emailOptional)) {
+      return json({ error: INVALID_EMAIL }, 400)
+    }
+    if (fields.length < 2) {
+      return json({ error: 'Please fill in the form' }, 400)
     }
     if (typeof token !== 'string' || !token.trim() || token.length > 2048) {
       return json({ error: 'Please complete the spam check and try again' }, 400)

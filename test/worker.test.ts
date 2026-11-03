@@ -95,8 +95,11 @@ test('a form with a field list ignores other fields and needs its required ones'
   const { body } = decode(sent(send.mock.calls[0]?.arguments[0])[2])
   assert.match(body, /Contact form from Test Visitor\n\nName:\nTest Visitor\n\nEmail:\nvisitor@example.com\n\nMessage:\nHello/)
   assert.doesNotMatch(body, /Not emailed/)
-  assert.equal((await handle(request({ ...contact, message: '  ' }), 'contact', env)).status, 400)
-  assert.equal((await handle(request({ email: 'visitor@example.com', message: 'Hi' }), 'contact', env)).status, 400)
+  const blank = await handle(request({ ...contact, message: '  ' }), 'contact', env)
+  assert.equal(blank.status, 400)
+  assert.deepEqual(await blank.json(), { error: 'Please fill in Message' })
+  const neither = await handle(request({ email: 'visitor@example.com' }), 'contact', env)
+  assert.deepEqual(await neither.json(), { error: 'Please fill in Name, Message' })
 })
 
 test('a form can go without an email address, and then has no Reply-To', async (t) => {
@@ -159,7 +162,11 @@ test('bad requests are refused before verification', async (t) => {
   const { env, send, verify } = setup(t)
   assert.equal((await handle(request(), 'unknown', env)).status, 404)
   assert.equal((await handle(request(), 'toString', env)).status, 404)
-  assert.equal((await handle(request({ ...enquiry, email: 'nope' }), 'enquiry', env)).status, 400)
+  for (const email of ['nope', 'visitor@example']) {
+    const response = await handle(request({ ...enquiry, email }), 'enquiry', env)
+    assert.equal(response.status, 400)
+    assert.match(JSON.stringify(await response.json()), /full email address/)
+  }
   assert.equal((await handle(request({ ...enquiry, 'bad field!': 'x' }), 'enquiry', env)).status, 400)
   assert.equal((await handle(request(enquiry, { headers: { Origin: 'https://attacker.example' } }), 'enquiry', env)).status, 403)
   assert.equal((await handle(new Request('https://example.com/api/forms/enquiry'), 'enquiry', env)).status, 405)
