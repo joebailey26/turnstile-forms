@@ -1,4 +1,5 @@
 import { onMounted, ref, toValue, type MaybeRefOrGetter } from 'vue'
+import { EMAIL, INVALID_EMAIL } from './email.ts'
 
 // A field's v-model value: text, or a list (sent joined with commas).
 export type FormValue = string | number | string[] | null | undefined
@@ -20,8 +21,9 @@ const isObject = (value: unknown): value is object => typeof value === 'object' 
 const errorFrom = (result: unknown) => (isObject(result) && 'error' in result && typeof result.error === 'string' ? result.error : '')
 
 // A form that posts to the forms Worker after a Turnstile check. Bind `formEl` to the <form>, call `changed`
-// on its input and change events and `setToken` with the widget's tokens. Drafts are kept in localStorage,
-// and `canSubmit` is true once the browser's own validation passes and the spam check has a token.
+// on its input and change events and `setToken` with the widget's tokens. Drafts are kept in localStorage.
+// `canSubmit` is true once the spam check has a token, and stays true for invalid fields, so submitting
+// shows the browser's message on the field that needs fixing. `sending` is true while the message is sent.
 export function useForm (name: string, { storageKey = name, endpoint = `/api/forms/${name}`, turnstile }: FormOptions = {}) {
   const form = ref<FormFields>({})
   const formEl = ref<HTMLFormElement | null>(null)
@@ -31,10 +33,21 @@ export function useForm (name: string, { storageKey = name, endpoint = `/api/for
   const token = ref('')
 
   const validate = () => {
-    canSubmit.value = Boolean(formEl.value?.checkValidity() && token.value) && !sending.value
+    canSubmit.value = Boolean(token.value) && !sending.value
+  }
+
+  // The browser accepts addresses without a dot in the domain, which the Worker refuses.
+  const checkEmail = () => {
+    // Forms without an email field, or with several, are left to the Worker.
+    const input = formEl.value?.elements.namedItem('email') as HTMLInputElement | null | undefined
+    if (input?.setCustomValidity) {
+      const value = input.value.trim()
+      input.setCustomValidity(value && !EMAIL.test(value) ? INVALID_EMAIL : '')
+    }
   }
 
   const changed = () => {
+    checkEmail()
     try {
       localStorage.setItem(storageKey, JSON.stringify(form.value))
     } catch {
@@ -66,6 +79,14 @@ export function useForm (name: string, { storageKey = name, endpoint = `/api/for
     if (!canSubmit.value) {
       return false
     }
+    checkEmail()
+    // Shows the browser's message on the first field that needs fixing.
+    if (formEl.value && !formEl.value.checkValidity()) {
+      formEl.value.reportValidity()
+
+      return false
+    }
+    message.value = ''
     sending.value = true
     validate()
     const body = new FormData()

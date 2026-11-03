@@ -106,24 +106,53 @@ function contact (t: TestContext, ok = true) {
   t.mock.method(console, 'warn', () => {})
   const form = useForm('contact', { storageKey: 'contactForm', turnstile: { reset } })
   let valid = true
-  // Only checkValidity() is called on the form element.
-  form.formEl.value = { checkValidity: () => valid } as HTMLFormElement
+  // The email input's custom message counts towards the form's validity, as in the browser.
+  const email = { value: 'visitor@example.com', validationMessage: '', setCustomValidity (text: string) { this.validationMessage = text } }
+  const reportValidity = t.mock.fn()
+  form.formEl.value = {
+    checkValidity: () => valid && !email.validationMessage,
+    reportValidity,
+    elements: { namedItem: (key: string) => (key === 'email' ? email : null) }
+  } as unknown as HTMLFormElement
   form.form.value = { name: 'Visitor', email: 'visitor@example.com', message: 'Hello', topics: ['Web', 'SEO'] }
 
-  return { form, fetch, reset, storage, invalid: () => { valid = false } }
+  return { form, fetch, reset, storage, email, reportValidity, invalid: () => { valid = false } }
 }
 
-test('a form needs browser validation and a solved token before sending', async (t) => {
-  const { form, fetch, invalid } = contact(t)
+test('a form needs a solved token before sending', async (t) => {
+  const { form, fetch } = contact(t)
   form.changed()
   assert.equal(form.canSubmit.value, false)
   assert.equal(await form.submit('Sent'), false)
   assert.equal(fetch.mock.callCount(), 0)
   form.setToken('solved-token')
   assert.equal(form.canSubmit.value, true)
+})
+
+test('an invalid field can still be submitted, which shows the browser\'s message on it', async (t) => {
+  const { form, fetch, reportValidity, invalid } = contact(t)
+  form.setToken('solved-token')
   invalid()
   form.changed()
-  assert.equal(form.canSubmit.value, false)
+  assert.equal(form.canSubmit.value, true, 'a disabled button would give no feedback')
+  assert.equal(await form.submit('Sent'), false)
+  assert.equal(reportValidity.mock.callCount(), 1)
+  assert.equal(fetch.mock.callCount(), 0)
+})
+
+test('an email address without a dot in its domain gets a message the browser would not give', async (t) => {
+  const { form, fetch, email, reportValidity } = contact(t)
+  form.setToken('solved-token')
+  email.value = 'visitor@example'
+  form.changed()
+  assert.match(email.validationMessage, /name@example\.com/)
+  assert.equal(await form.submit('Sent'), false)
+  assert.equal(reportValidity.mock.callCount(), 1)
+  assert.equal(fetch.mock.callCount(), 0)
+  email.value = 'visitor@example.com'
+  form.changed()
+  assert.equal(email.validationMessage, '')
+  assert.equal(await form.submit('Sent'), true)
 })
 
 test('drafts are kept until the form is sent', async (t) => {
