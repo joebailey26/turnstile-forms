@@ -50,6 +50,8 @@ The package is published to GitHub Packages, which needs a token with `read:pack
 
 ## Development
 
+`eslint-config-galexia` is installed from GitHub Packages too, so add a `read:packages` token to your user `.npmrc` (`//npm.pkg.github.com/:_authToken=...`) before installing.
+
 ```powershell
 corepack enable
 pnpm install
