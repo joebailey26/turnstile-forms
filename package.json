@@ -1,0 +1,62 @@
+{
+  "name": "@joebailey26/turnstile-forms",
+  "version": "0.1.0",
+  "description": "Website forms checked by Cloudflare Turnstile and emailed by a Worker, with the Vue composables for the form and widget",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/joebailey26/turnstile-forms.git"
+  },
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/worker.d.ts",
+      "default": "./dist/worker.js"
+    },
+    "./vue": {
+      "types": "./dist/vue.d.ts",
+      "default": "./dist/vue.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "node --test --test-isolation=none test/*.test.ts",
+    "lint": "eslint .",
+    "fix": "eslint . --fix",
+    "check": "pnpm run lint && pnpm run typecheck",
+    "changeset": "changeset",
+    "release": "pnpm run build && changeset publish",
+    "prepack": "pnpm run build"
+  },
+  "peerDependencies": {
+    "vue": "^3.5.0"
+  },
+  "peerDependenciesMeta": {
+    "vue": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.29.7",
+    "@stylistic/eslint-plugin": "^4.4.1",
+    "@types/node": "^24.19.2",
+    "eslint": "^10.13.0",
+    "eslint-config-galexia": "npm:@galexia-agency/eslint-config-galexia@3.3.0",
+    "globals": "^17.0.0",
+    "typescript": "^6.0.3",
+    "vue": "^3.5.44"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "engines": {
+    "node": "^24.18.0",
+    "pnpm": "^10.11.1"
+  },
+  "packageManager": "pnpm@10.11.1"
+}
